@@ -1,0 +1,115 @@
+name: build
+ 
+on:
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  checks: write
+  contents: none
+  deployments: none
+  issues: none
+  packages: none
+  pull-requests: write
+  repository-projects: none
+  security-events: write
+  statuses: write
+
+jobs:
+  build:
+    runs-on: macos-11
+
+    if: github.actor != 'dependabot[bot]'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+    steps:
+      - name: Set Xcode version
+        run: sudo xcode-select -s "/Applications/Xcode_13.2.app"
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Import iOS CodeSign Certificates
+        if: github.actor != 'dependabot[bot]'
+        uses: Apple-Actions/import-codesign-certs@v1
+        with:
+          create-keychain: true
+          keychain-password: ${{ steps.develop-certificate.outputs.keychain-password }}
+          p12-file-base64: ${{ secrets.DISTRIBUTION_CERTIFICATES_FILE_BASE64 }}
+          p12-password: ${{ secrets.CERTIFICATES_PASSWORD }}
+
+      - name: Download Provisioning Profiles
+        if: github.actor != 'dependabot[bot]'
+        uses: poad/apple-provisioning-profiles-downloader@v1.0.5
+        with: 
+          bundle-id: 'com.github.poad.Firebase-Invistigate'
+          profile-type: IOS_APP_STORE
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Generate GoogleService-Info.plist.plist
+        if: github.actor != 'dependabot[bot]'
+        env:
+          GOOGLE_SERVICE_INFO_PLIST: ${{ secrets.GOOGLE_SERVICE_INFO }}
+        run: |
+          touch "Firebase Invistigate/GoogleService-Info.plist"
+          echo "${GOOGLE_SERVICE_INFO_PLIST}" >> "Firebase Invistigate/GoogleService-Info.plist"
+          cat "Firebase Invistigate/GoogleService-Info.plist"
+
+      - name: Generate exportOptions.plist
+        if: github.actor != 'dependabot[bot]'
+        env:
+          PLIST: ${{ secrets.EXPORT_OPTIONS_PLIST }}
+        run: |
+          touch exportOptions.plist
+          echo "${PLIST}" >> exportOptions.plist
+          cat exportOptions.plist
+
+      - name: iOS app build (without export)
+        if: github.actor == 'dependabot[bot]'
+        uses: macmade/action-xcodebuild@v1.0.0
+        with:
+          project: 'Firebase Invistigate.xcodeproj'
+          scheme: 'Firebase Invistigate'
+          build: 1
+          analyze: 1
+          test: 1
+          info: 1
+          destination: 'platform=iOS Simulator,name=iPhone 13 Pro Max'
+
+      - name: iOS app export
+        run: xcodebuild -exportArchive -archivePath ./FirebaseInvistigate.xcarchive -exportPath . -exportOptionsPlist exportOptions.plist -allowProvisioningUpdates
+
+      - name: Lookup IPA file
+        run: |
+          ipa_file_path=$(pwd)/$(ls ./ios/*.ipa)
+          if [ -z ${ipa_file_path} ]; then
+            echo "IPA file is not found" >2
+            exit 1;
+          fi
+          echo "ipa_file_path=${ipa_file_path}" >> $GITHUB_ENV
+
+      - name: Upload IPA file to DeployGate
+        env:
+          FILE_PATH: ${{ env.ipa_file_path }}
+        run: |
+          RESULT=$(curl -sSL \
+            -H "Authorization: token ${{ secrets.DEPLOYGATE_API_TOKEN }}" \
+            -F "file=@${FILE_PATH}" \
+            "https://deploygate.com/api/users/poad/apps")
+          ERR=$(echo ${RESULT} | jq -c ".error")
+          if [ "${ERR}" = "true" ]; then
+            echo ${RESULT}
+            exit 1;
+          fi

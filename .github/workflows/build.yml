@@ -1,0 +1,98 @@
+name: build
+ 
+on:
+  pull_request_target:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  checks: write
+  contents: none
+  deployments: none
+  issues: none
+  packages: none
+  pull-requests: write
+  repository-projects: none
+  security-events: write
+  statuses: write
+
+jobs:
+  setup:
+    runs-on: macos-11
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+    steps:
+      - name: Set Xcode version
+        run: sudo xcode-select -s "/Applications/Xcode_13.2.app"
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Import iOS CodeSign Certificates
+        uses: Apple-Actions/import-codesign-certs@v1
+        with:
+          create-keychain: true
+          keychain-password: ${{ steps.develop-certificate.outputs.keychain-password }}
+          p12-file-base64: ${{ secrets.DISTRIBUTION_CERTIFICATES_FILE_BASE64 }}
+          p12-password: ${{ secrets.CERTIFICATES_PASSWORD }}
+
+      - name: Download Provisioning Profiles
+        uses: poad/apple-provisioning-profiles-downloader@v1.0.5
+        with: 
+          bundle-id: 'com.github.poad.Firebase-Invistigate'
+          profile-type: IOS_APP_STORE
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Generate GoogleService-Info.plist.plist
+        if: github.actor != 'dependabot[bot]'
+        env:
+          GOOGLE_SERVICE_INFO_PLIST: ${{ secrets.GOOGLE_SERVICE_INFO }}
+        run: |
+          touch "Firebase Invistigate/GoogleService-Info.plist"
+          echo "${GOOGLE_SERVICE_INFO_PLIST}" >> "Firebase Invistigate/GoogleService-Info.plist"
+          cat "Firebase Invistigate/GoogleService-Info.plist"
+
+      - name: Generate exportOptions.plist
+        env:
+          PLIST: ${{ secrets.EXPORT_OPTIONS_PLIST }}
+        run: |
+          touch exportOptions.plist
+          echo "${PLIST}" >> exportOptions.plist
+          cat exportOptions.plist
+
+      - name: iOS app build (without export)
+        uses: macmade/action-xcodebuild@v1.0.0
+        with:
+          project: 'Firebase Invistigate.xcodeproj'
+          scheme: 'Firebase Invistigate'
+          build: 1
+          analyze: 1
+          test: 1
+          info: 1
+          destination: 'platform=iOS Simulator,name=iPhone 13 Pro Max'
+
+  configure:
+    runs-on: ubuntu-latest
+    if: github.actor != 'dependabot[bot]'
+    steps:
+    - name: Pull request auto merge enabler
+      if: github.event_name == 'pull_request'
+      uses: poad/github-pull-request-auto-merge-enable-action@v1.0.1
+      with:
+        pull_request_id: ${{ github.event.pull_request.node_id }}
+        github_token: ${{ secrets.PERSONAL_TOKEN_FOR_GITHUB_ACTIONS }}
+        repository: ${{ github.event.repository.name }}
+        owner: ${{ github.repository_owner }}
+        merge_method: SQUASH
