@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>development</key>
+    <string>export</string>
+    <key>method</key>
+    <string>development</string>
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>com.github.poad.Firebase-Invistigate</key>
+        <string>${PROVISONING_PROFILE_UUID}</string>
+    </dict>
+    <key>teamID</key>
+    <string>39V96C2P97</string>
+    <key>signingCertificate</key>
+    <string>Apple Development</string>
+    <key>signingStyle</key>
+    <string>automatic</string>
+</dict>
+</plist>
