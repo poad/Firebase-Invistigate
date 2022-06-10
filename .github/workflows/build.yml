@@ -69,16 +69,11 @@ jobs:
           echo "${PLIST}" >> exportOptions.plist
           cat exportOptions.plist
 
-      - name: iOS app build (without export)
-        uses: macmade/action-xcodebuild@v1.0.0
+      - name: iOS app build
+        uses: devbotsxyz/xcode-build@v1
         with:
           project: 'Firebase Invistigate.xcodeproj'
           scheme: 'Firebase Invistigate'
-          build: 1
-          analyze: 1
-          test: 1
-          info: 1
-          destination: 'platform=iOS Simulator,name=iPhone 13 Pro Max'
 
   configure:
     runs-on: ubuntu-latest

@@ -69,36 +69,7 @@ jobs:
           cat exportOptions.plist
 
       - name: iOS app build
-        env:
-          RCT_NO_LAUNCH_PACKAGER: 1
-        uses: devbotsxyz/xcode-archive@main
+        uses: devbotsxyz/xcode-build@v1
         with:
           project: 'Firebase Invistigate.xcodeproj'
           scheme: 'Firebase Invistigate'
-          archive-path: FirebaseInvistigate.xcarchive
-
-      - name: iOS app export
-        run: xcodebuild -exportArchive -archivePath ./FirebaseInvistigate.xcarchive -exportPath . -exportOptionsPlist exportOptions.plist -allowProvisioningUpdates
-
-      - name: Lookup IPA file
-        run: |
-          ipa_file_path=$(pwd)/$(ls ./ios/*.ipa)
-          if [ -z ${ipa_file_path} ]; then
-            echo "IPA file is not found" >2
-            exit 1;
-          fi
-          echo "ipa_file_path=${ipa_file_path}" >> $GITHUB_ENV
-
-      - name: Upload IPA file to DeployGate
-        env:
-          FILE_PATH: ${{ env.ipa_file_path }}
-        run: |
-          RESULT=$(curl -sSL \
-            -H "Authorization: token ${{ secrets.DEPLOYGATE_API_TOKEN }}" \
-            -F "file=@${FILE_PATH}" \
-            "https://deploygate.com/api/users/poad/apps")
-          ERR=$(echo ${RESULT} | jq -c ".error")
-          if [ "${ERR}" = "true" ]; then
-            echo ${RESULT}
-            exit 1;
-          fi

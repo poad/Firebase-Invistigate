@@ -89,3 +89,5 @@ fastlane/test_output
 
 iOSInjectionProject/
 .DS_Store
+
+Firebase Invistigate/GoogleService-Info.plist
